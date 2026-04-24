@@ -45,7 +45,7 @@ export function TradingViewWidget({
     <section className="detail-card tradingview-shell">
       <div className="section-head">
         <div className="eyebrow">TradingView</div>
-        <h2 className="section-title">차트 분석</h2>
+        <h2 className="section-title">차트 분석 · {symbol}</h2>
       </div>
       <div className="tv-frame">
         <div ref={containerRef} style={{ height: "100%" }} />
@@ -56,4 +56,3 @@ export function TradingViewWidget({
     </section>
   );
 }
-

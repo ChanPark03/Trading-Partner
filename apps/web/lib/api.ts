@@ -48,8 +48,14 @@ export async function getDashboard(): Promise<DashboardPayload> {
   return requestOrFallback("/api/v1/dashboard", dashboardMock);
 }
 
-export async function getExplore(assetClass?: string): Promise<ExplorePayload> {
-  const query = assetClass ? `?asset_class=${assetClass}` : "";
+export async function getExplore(filters: Record<string, string | number | boolean | undefined> = {}): Promise<ExplorePayload> {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== "" && value !== null) {
+      params.set(key, String(value));
+    }
+  });
+  const query = params.toString() ? `?${params.toString()}` : "";
   return requestOrFallback(`/api/v1/explore${query}`, exploreMock);
 }
 
@@ -112,4 +118,3 @@ export async function updateProfile(payload: ProfileUpdatePayload) {
 export function findIdeaById(assetId: string): RecommendationSnapshot | undefined {
   return dashboardMock.top_ideas.find((idea) => idea.asset_id === assetId);
 }
-

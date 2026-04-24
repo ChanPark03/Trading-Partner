@@ -9,6 +9,8 @@ RecommendationLabel = Literal["매수", "관망", "회피"]
 RiskSeverity = Literal["low", "medium", "high"]
 AlertLevel = Literal["info", "warning", "critical"]
 SignalSentiment = Literal["bullish", "neutral", "bearish"]
+TrendState = Literal["bullish", "neutral", "bearish"]
+ExploreSort = Literal["score_desc", "score_asc", "change_desc", "confidence_desc", "volume_desc", "symbol_asc"]
 
 
 def utc_now() -> datetime:
@@ -50,6 +52,24 @@ class CanonicalMarketSnapshot(BaseModel):
     tradingview_symbol: str
 
 
+class MarketSnapshot(CanonicalMarketSnapshot):
+    as_of: datetime = Field(default_factory=utc_now)
+
+
+class AssetUniverseMember(BaseModel):
+    asset_id: str
+    symbol: str
+    name: str
+    asset_class: AssetClass
+    tradingview_symbol: str
+
+
+class TradingViewSymbolMap(BaseModel):
+    asset_id: str
+    symbol: str
+    tradingview_symbol: str
+
+
 class CanonicalDerivativesSignal(BaseModel):
     symbol: str
     mark_price: float
@@ -79,6 +99,12 @@ class RecommendationSnapshot(BaseModel):
     tradingview_symbol: str
     explanation: str
     score: float = Field(ge=0.0, le=100.0)
+
+
+class SignalSet(BaseModel):
+    asset_id: str
+    trend_state: TrendState
+    signals: list[SignalValue]
 
 
 class AlertEvent(BaseModel):
@@ -123,9 +149,25 @@ class DashboardPayload(BaseModel):
 
 class AssetAnalysisPayload(BaseModel):
     asset: RecommendationSnapshot
-    market_snapshot: dict
+    market_snapshot: MarketSnapshot
     technical_summary: list[str]
     risk_summary: list[str]
+
+
+class ExploreFilters(BaseModel):
+    asset_class: Optional[AssetClass] = None
+    label: Optional[RecommendationLabel] = None
+    search: Optional[str] = None
+    min_score: Optional[float] = None
+    max_volatility: Optional[float] = None
+    min_volume: Optional[float] = None
+    trend_state: Optional[TrendState] = None
+    personalized: bool = True
+
+
+class ExploreSortMetadata(BaseModel):
+    sort: ExploreSort = "score_desc"
+    personalized: bool = True
 
 
 class ExplorePayload(BaseModel):
@@ -133,6 +175,9 @@ class ExplorePayload(BaseModel):
     total: int
     page: int
     page_size: int
+    sort: ExploreSortMetadata
+    applied_filters: ExploreFilters
+    available_filters: dict
 
 
 class WatchlistPayload(BaseModel):
@@ -157,4 +202,3 @@ class WatchlistCreatePayload(BaseModel):
 
 class PortfolioUpdatePayload(BaseModel):
     positions: list[PortfolioPosition]
-

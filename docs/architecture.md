@@ -13,15 +13,28 @@
 3. External payloads are normalized into canonical market models before scoring.
 4. Recommendation engine computes signals, risk gates, price targets, stop ranges, and invalidation rules.
 5. `ExplanationProvider` synthesizes Korean copy from structured recommendation facts only.
-6. Worker stores fresh recommendation snapshots.
-7. API reads global snapshots and applies user-specific ranking boosts from profile, watchlist, and manual holdings.
-8. Frontend renders recommendation cards and TradingView widgets side-by-side.
+6. Worker stores both raw `MarketSnapshot` payloads and fresh recommendation snapshots.
+7. API reads global snapshots and applies user-specific ranking boosts from profile, watchlist, and manual holdings without mutating raw facts.
+8. Frontend renders dense analyst-workspace pages with TradingView widgets and adjacent recommendation/risk panels.
 
 ## Auth and Storage
 
 - Production target: Supabase Auth + Postgres
 - Local fallback in this repo: demo session + SQLite
-- Health endpoint reports current market-data and explanation runtime modes
+- `Authorization: Bearer` with `SUPABASE_JWT_SECRET` uses the JWT `sub` as `user_id`
+- Without Supabase JWT settings, API keeps the `x-user-id` / demo fallback
+- Repository factory reports a Postgres-ready storage mode, while SQLite remains the executable MVP backend until migrations are added
+- Health endpoint reports current market-data, explanation, auth, and storage runtime modes
+
+## Explore and Alerts
+
+- `GET /api/v1/explore` supports asset class, recommendation label, score, volatility, volume, trend state, personalization, and sort filters.
+- Recompute stores market snapshots and can create user-scoped alert events for watched or held assets when high-risk flags appear or recommendation labels downgrade.
+
+## UI Verification
+
+- UI verification uses the installed Playwright CLI skill.
+- Artifacts should be captured under `output/playwright/` for desktop, tablet, and mobile viewports.
 
 ## Refresh Policy
 

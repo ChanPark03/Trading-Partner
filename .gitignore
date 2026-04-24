@@ -13,4 +13,5 @@ apps/api/.env
 apps/web/.env.local
 apps/api/data/*.db
 apps/api/data/*.sqlite3
-
+output/playwright/
+.playwright-cli/

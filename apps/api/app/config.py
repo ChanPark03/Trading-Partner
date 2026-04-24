@@ -49,6 +49,15 @@ class ExplanationSettings:
         return self.provider not in {"mock", "template"} and bool(self.openai_api_key)
 
 
+@dataclass(frozen=True)
+class AuthSettings:
+    supabase_jwt_secret: str = ""
+
+    @property
+    def supabase_ready(self) -> bool:
+        return bool(self.supabase_jwt_secret)
+
+
 def get_market_data_settings() -> MarketDataSettings:
     return MarketDataSettings(
         alpaca_api_key=os.getenv("ALPACA_API_KEY", ""),
@@ -66,3 +75,7 @@ def get_explanation_settings() -> ExplanationSettings:
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-5.4-mini"),
     )
+
+
+def get_auth_settings() -> AuthSettings:
+    return AuthSettings(supabase_jwt_secret=os.getenv("SUPABASE_JWT_SECRET", ""))

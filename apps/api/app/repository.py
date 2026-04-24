@@ -4,12 +4,13 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Protocol
 from uuid import uuid4
 
-from app.config import DEFAULT_DB_PATH
+from app.config import DATABASE_URL, DEFAULT_DB_PATH
 from app.models.contracts import (
     AlertEvent,
+    MarketSnapshot,
     PortfolioPosition,
     ProfileUpdatePayload,
     RecommendationSnapshot,
@@ -72,15 +73,27 @@ class Database:
                     detail TEXT NOT NULL,
                     level TEXT NOT NULL,
                     is_read INTEGER NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    dedupe_key TEXT
                 );
                 CREATE TABLE IF NOT EXISTS recommendations (
                     asset_id TEXT PRIMARY KEY,
                     payload TEXT NOT NULL,
                     as_of TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS market_snapshots (
+                    asset_id TEXT PRIMARY KEY,
+                    payload TEXT NOT NULL,
+                    as_of TEXT NOT NULL
+                );
                 """
             )
+            alert_columns = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(alerts)").fetchall()
+            }
+            if "dedupe_key" not in alert_columns:
+                conn.execute("ALTER TABLE alerts ADD COLUMN dedupe_key TEXT")
 
     def ensure_demo_profile(self, user_id: str = "demo-user") -> UserProfile:
         profile = self.get_profile(user_id)
@@ -216,14 +229,29 @@ class Database:
             for row in rows
         ]
 
-    def create_alert(self, user_id: str, asset_id: str, title: str, detail: str, level: str = "info") -> None:
+    def create_alert(
+        self,
+        user_id: str,
+        asset_id: str,
+        title: str,
+        detail: str,
+        level: str = "info",
+        dedupe_key: Optional[str] = None,
+    ) -> None:
         with self.connect() as conn:
+            if dedupe_key:
+                existing = conn.execute(
+                    "SELECT id FROM alerts WHERE user_id = ? AND dedupe_key = ?",
+                    (user_id, dedupe_key),
+                ).fetchone()
+                if existing is not None:
+                    return
             conn.execute(
                 """
-                INSERT INTO alerts (id, user_id, asset_id, title, detail, level, is_read, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+                INSERT INTO alerts (id, user_id, asset_id, title, detail, level, is_read, created_at, dedupe_key)
+                VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """,
-                (str(uuid4()), user_id, asset_id, title, detail, level, _utcnow_iso()),
+                (str(uuid4()), user_id, asset_id, title, detail, level, _utcnow_iso(), dedupe_key),
             )
 
     def mark_alert_read(self, user_id: str, alert_id: str) -> None:
@@ -261,3 +289,73 @@ class Database:
         if row is None:
             return None
         return RecommendationSnapshot.model_validate_json(row["payload"])
+
+    def save_market_snapshots(self, snapshots: list[MarketSnapshot]) -> None:
+        with self.connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO market_snapshots (asset_id, payload, as_of)
+                VALUES (?, ?, ?)
+                ON CONFLICT(asset_id) DO UPDATE SET
+                    payload = excluded.payload,
+                    as_of = excluded.as_of
+                """,
+                [
+                    (
+                        snapshot.asset_id,
+                        snapshot.model_dump_json(),
+                        snapshot.as_of.isoformat(),
+                    )
+                    for snapshot in snapshots
+                ],
+            )
+
+    def list_market_snapshots(self) -> list[MarketSnapshot]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT payload FROM market_snapshots").fetchall()
+        return [MarketSnapshot.model_validate_json(row["payload"]) for row in rows]
+
+    def get_market_snapshot(self, asset_id: str) -> Optional[MarketSnapshot]:
+        with self.connect() as conn:
+            row = conn.execute("SELECT payload FROM market_snapshots WHERE asset_id = ?", (asset_id,)).fetchone()
+        if row is None:
+            return None
+        return MarketSnapshot.model_validate_json(row["payload"])
+
+    def get_user_ids_for_asset(self, asset_id: str) -> list[str]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT user_id FROM watchlist WHERE asset_id = ?
+                UNION
+                SELECT user_id FROM portfolio WHERE asset_id = ?
+                """,
+                (asset_id, asset_id),
+            ).fetchall()
+        return [row["user_id"] for row in rows]
+
+
+class RepositoryProtocol(Protocol):
+    def ensure_demo_profile(self, user_id: str = "demo-user") -> UserProfile:
+        ...
+
+    def list_recommendations(self) -> list[RecommendationSnapshot]:
+        ...
+
+    def get_recommendation(self, asset_id: str) -> Optional[RecommendationSnapshot]:
+        ...
+
+    def get_market_snapshot(self, asset_id: str) -> Optional[MarketSnapshot]:
+        ...
+
+
+def get_storage_mode(database_url: str = DATABASE_URL) -> str:
+    if database_url.startswith(("postgres://", "postgresql://")):
+        return "postgres-ready"
+    return "sqlite"
+
+
+def create_repository() -> Database:
+    # Postgres uses the same repository protocol next, but SQLite stays the
+    # executable local default until migrations are introduced.
+    return Database()

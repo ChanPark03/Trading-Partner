@@ -188,10 +188,19 @@ export const dashboardMock: DashboardPayload = {
 export const assetDetailMock: AssetAnalysisPayload = {
   asset: recommendations[0],
   market_snapshot: {
+    asset_id: "crypto-btc",
+    symbol: "BTC/USD",
+    name: "Bitcoin",
+    asset_class: "crypto",
+    current_price: 78235.09,
+    previous_close: 76348,
     day_high: 78545.89,
     day_low: 76146.45,
     volume: 0.725,
-    previous_close: 76348
+    change_percent_24h: 2.47,
+    volatility: 0.032,
+    tradingview_symbol: "BINANCE:BTCUSDT",
+    as_of: iso
   },
   technical_summary: [
     "4시간봉 기준 고점/저점이 동반 상승 중입니다.",
@@ -208,7 +217,27 @@ export const exploreMock: ExplorePayload = {
   items: recommendations,
   total: recommendations.length,
   page: 1,
-  page_size: 12
+  page_size: 12,
+  sort: {
+    sort: "score_desc",
+    personalized: true
+  },
+  applied_filters: {
+    asset_class: null,
+    label: null,
+    search: null,
+    min_score: null,
+    max_volatility: null,
+    min_volume: null,
+    trend_state: null,
+    personalized: true
+  },
+  available_filters: {
+    asset_classes: ["stock", "etf", "crypto"],
+    recommendation_labels: ["매수", "관망", "회피"],
+    trend_states: ["bullish", "neutral", "bearish"],
+    sort_options: ["score_desc", "score_asc", "change_desc", "confidence_desc", "volume_desc", "symbol_asc"]
+  }
 };
 
 export const watchlistMock: WatchlistItem[] = [
@@ -230,4 +259,3 @@ export const profileMock: UserProfile = {
   locale: "ko-KR",
   completed_onboarding: true
 };
-

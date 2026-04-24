@@ -11,6 +11,8 @@
     "test:web": "npm --workspace apps/web run test",
     "lint:web": "npm --workspace apps/web run lint",
     "test:api": "python3 -m pytest apps/api/tests -q"
+  },
+  "dependencies": {
+    "lucide-react": "^1.9.0"
   }
 }
-
